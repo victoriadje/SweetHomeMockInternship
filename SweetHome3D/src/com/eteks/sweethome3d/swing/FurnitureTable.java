@@ -1128,9 +1128,11 @@ public class FurnitureTable extends JTable implements View, Printable {
           return preferences.getLocalizedString(FurnitureTable.class, "widthColumn");
         case DEPTH :
           return preferences.getLocalizedString(FurnitureTable.class, "depthColumn");
-        case HEIGHT : 
+        case HEIGHT :
           return preferences.getLocalizedString(FurnitureTable.class, "heightColumn");
-        case X : 
+        case VOLUME:
+          return preferences.getLocalizedString(FurnitureTable.class, "volumeColumn");
+        case X :
           return preferences.getLocalizedString(FurnitureTable.class, "xColumn");
         case Y :
           return preferences.getLocalizedString(FurnitureTable.class, "yColumn");
@@ -1157,7 +1159,7 @@ public class FurnitureTable extends JTable implements View, Printable {
         case VALUE_ADDED_TAX :
           return preferences.getLocalizedString(FurnitureTable.class, "valueAddedTaxColumn");          
         case PRICE_VALUE_ADDED_TAX_INCLUDED :
-          return preferences.getLocalizedString(FurnitureTable.class, "priceValueAddedTaxIncludedColumn");          
+          return preferences.getLocalizedString(FurnitureTable.class, "priceValueAddedTaxIncludedColumn");
         default :
           throw new IllegalArgumentException("Unknown column name " + property);
       }
