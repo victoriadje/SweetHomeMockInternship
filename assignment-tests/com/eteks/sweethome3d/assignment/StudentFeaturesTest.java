@@ -98,12 +98,12 @@ class StudentFeaturesTest {
     try {
       assertEquals(PlanComponent.PAGE_EXISTS, plan.print(graphics, pageFormat, 0));
       assertEquals(PlanComponent.PAGE_EXISTS, plan.print(graphics, pageFormat, 1),
-          "Task 4: the second level should have a plan page");
+              "Task 4: the second level should have a plan page");
       assertEquals(PlanComponent.PAGE_EXISTS, plan.print(graphics, pageFormat, 2),
-          "Task 4: the third level should have a plan page");
+              "Task 4: the third level should have a plan page");
       assertEquals(PlanComponent.NO_SUCH_PAGE, plan.print(graphics, pageFormat, 3));
       assertEquals(originallySelected, home.getSelectedLevel(),
-          "Task 4: printing must restore the selected level");
+              "Task 4: printing must restore the selected level");
     } finally {
       graphics.dispose();
     }
