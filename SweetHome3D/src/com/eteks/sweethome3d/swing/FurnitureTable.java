@@ -778,7 +778,38 @@ public class FurnitureTable extends JTable implements View, Printable {
       // Change printable column header renderer
       printableColumn.setHeaderRenderer(printableHeaderRenderer);
       printableColumnModel.addColumn(printableColumn);
-    }    
+    }
+    // Ensure the Level column is printed, without changing the columns displayed on screen
+    boolean levelColumnPrinted = false;
+    for (int i = 0, n = printableColumnModel.getColumnCount(); i < n; i++) {
+      if (printableColumnModel.getColumn(i).getIdentifier()
+              == HomePieceOfFurniture.SortableProperty.LEVEL) {
+        levelColumnPrinted = true;
+        break;
+      }
+    }
+    if (!levelColumnPrinted) {
+      TableColumn levelColumn = new TableColumn(0);
+      levelColumn.setIdentifier(HomePieceOfFurniture.SortableProperty.LEVEL);
+      levelColumn.setHeaderValue(this.preferences.getLocalizedString(FurnitureTable.class, "levelColumn"));
+      levelColumn.setPreferredWidth(70);
+      levelColumn.setCellRenderer(new TableCellRenderer() {
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                       boolean isSelected, boolean hasFocus, int row, int column) {
+          Level level = value != null
+                  ? ((HomePieceOfFurniture)value).getLevel()
+                  : null;
+          Component component = defaultRenderer.getTableCellRendererComponent(table,
+                  level != null ? level.getName() : null, false, false, row, column);
+          component.setBackground(Color.WHITE);
+          component.setForeground(Color.BLACK);
+          return component;
+        }
+      });
+      levelColumn.setHeaderRenderer(printableHeaderRenderer);
+      printableColumnModel.addColumn(levelColumn);
+    }
+
     return print(g, pageFormat, pageIndex, printableColumnModel, Color.BLACK);
   }
 
@@ -790,24 +821,90 @@ public class FurnitureTable extends JTable implements View, Printable {
                     final int pageIndex, 
                     final TableColumnModel printableColumnModel,
                     final Color gridColor) throws PrinterException {
+//    if (EventQueue.isDispatchThread()) {
+//      TableColumnModel oldColumnModel = getColumnModel();
+//      Color oldGridColor = getGridColor();
+//
+//      setColumnModel(printableColumnModel);
+//      if (OperatingSystem.isWindows()) {
+//        // Add 3 pixels to columns to get a correct rendering
+//        updateTableColumnsWidth(3);
+//      } else {
+//        updateTableColumnsWidth(0);
+//      }
+//      setGridColor(gridColor);
+//      Printable printable = getPrintable(PrintMode.FIT_WIDTH, null, null);
+//      int pageExists = printable.print(g, pageFormat, pageIndex);
+//      // Restore column model and grid color to their previous values
+//      setColumnModel(printableColumnModel);
+//      setGridColor(oldGridColor);
+//
+//      return pageExists;
+//    }
+//    if (EventQueue.isDispatchThread()) {
+//      TableColumnModel oldColumnModel = getColumnModel();
+//      Color oldGridColor = getGridColor();
+//
+//      try {
+//        setColumnModel(printableColumnModel);
+//
+//        if (OperatingSystem.isWindows()) {
+//          // Add 3 pixels to columns to get a correct rendering
+//          updateTableColumnsWidth(3);
+//        } else {
+//          updateTableColumnsWidth(0);
+//        }
+//
+//        setGridColor(gridColor);
+//
+//        Printable printable = getPrintable(PrintMode.FIT_WIDTH, null, null);
+//        return printable.print(g, pageFormat, pageIndex);
+//
+//      } finally {
+//        // Restore original table appearance even if printing fails
+//        setColumnModel(oldColumnModel);
+//        setGridColor(oldGridColor);
+//      }
+//    }
+
+
     if (EventQueue.isDispatchThread()) {
       TableColumnModel oldColumnModel = getColumnModel();
       Color oldGridColor = getGridColor();
-      setColumnModel(printableColumnModel);   
-      if (OperatingSystem.isWindows()) {
-        // Add 3 pixels to columns to get a correct rendering
-        updateTableColumnsWidth(3);
-      } else {
-        updateTableColumnsWidth(0);
+
+      FurnitureTreeTableModel tableModel = (FurnitureTreeTableModel) getModel();
+      FurnitureFilter oldFilter = tableModel.getFurnitureFilter();
+      boolean oldPrintingAllLevels = tableModel.printingAllLevels;
+
+      try {
+        // Print furniture from all viewable levels.
+        tableModel.printingAllLevels = true;
+        tableModel.setFurnitureFilter(null);
+
+
+        setColumnModel(printableColumnModel);
+
+        if (OperatingSystem.isWindows()) {
+          updateTableColumnsWidth(3);
+        } else {
+          updateTableColumnsWidth(0);
+        }
+
+        setGridColor(gridColor);
+
+        Printable printable = getPrintable(PrintMode.FIT_WIDTH, null, null);
+        return printable.print(g, pageFormat, pageIndex);
+
+      } finally {
+        // Restore the original table configuration.
+        setColumnModel(oldColumnModel);
+        setGridColor(oldGridColor);
+        tableModel.printingAllLevels = oldPrintingAllLevels;
+        tableModel.setFurnitureFilter(oldFilter);
       }
-      setGridColor(gridColor);
-      Printable printable = getPrintable(PrintMode.FIT_WIDTH, null, null);
-      int pageExists = printable.print(g, pageFormat, pageIndex);
-      // Restore column model and grid color to their previous values
-      setColumnModel(oldColumnModel);
-      setGridColor(oldGridColor);
-      return pageExists;
-    } else {
+    }
+
+    else {
       // Print synchronously table in Event Dispatch Thread
       // The best solution should be to be able to print out of Event Dispatch Thread
       // a new instance of JTable customized with printableColumnModel and gridColor,
@@ -920,6 +1017,9 @@ public class FurnitureTable extends JTable implements View, Printable {
             break;
           case HEIGHT : 
             writer.write(sizeFormat.format(copiedPiece.getHeight()));
+            break;
+          case VOLUME:
+            writer.write(String.valueOf(copiedPiece.getVolume()));
             break;
           case X : 
             writer.write(sizeFormat.format(copiedPiece.getX()));
@@ -1219,7 +1319,7 @@ public class FurnitureTable extends JTable implements View, Printable {
         case HEIGHT : 
           return getSizeRenderer(HomePieceOfFurniture.SortableProperty.HEIGHT, preferences);
         case VOLUME:
-          return getSizeRenderer(HomePieceOfFurniture.SortableProperty.VOLUME, preferences);
+          return getVolumeRenderer();
         case X :
           return getSizeRenderer(HomePieceOfFurniture.SortableProperty.X, preferences);
         case Y :
@@ -1346,16 +1446,16 @@ public class FurnitureTable extends JTable implements View, Printable {
                     isSelected, hasFocus, row, column);
               }
             };
-        case VOLUME:
-          return new SizeRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table,
-                                                           Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-              return super.getTableCellRendererComponent(table,
-                      value != null  ? ((HomePieceOfFurniture)value).getVolume()  : null,
-                      isSelected, hasFocus, row, column);
-            }
-          };
+//        case VOLUME:
+//          return new SizeRenderer() {
+//            @Override
+//            public Component getTableCellRendererComponent(JTable table,
+//                                                           Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+//              return super.getTableCellRendererComponent(table,
+//                      value != null  ? ((HomePieceOfFurniture)value).getVolume()  : null,
+//                      isSelected, hasFocus, row, column);
+//            }
+//          };
         case X :
           return new SizeRenderer() {
               @Override
@@ -1390,7 +1490,35 @@ public class FurnitureTable extends JTable implements View, Printable {
           throw new IllegalArgumentException(property + " column not a size column");
       }
     }
+    /**
+     * Returns a renderer that displays furniture volume.
+     */
+    private TableCellRenderer getVolumeRenderer() {
+      return new DefaultTableCellRenderer() {
+        @Override
+        public Component getTableCellRendererComponent(
+                JTable table, Object value,
+                boolean isSelected, boolean hasFocus,
+                int row, int column) {
 
+          String volume = null;
+
+          if (value != null) {
+            HomePieceOfFurniture piece = (HomePieceOfFurniture)value;
+
+            NumberFormat format = NumberFormat.getNumberInstance();
+            format.setMaximumFractionDigits(2);
+
+            volume = format.format(piece.getVolume());
+          }
+
+          setHorizontalAlignment(JLabel.RIGHT);
+
+          return super.getTableCellRendererComponent(
+                  table, volume, isSelected, hasFocus, row, column);
+        }
+      };
+    }
     /**
      * Returns a renderer that converts the displayed <code>property</code> of a piece of furniture 
      * as a price. 
@@ -1999,6 +2127,7 @@ public class FurnitureTable extends JTable implements View, Printable {
     private Home                                    home;
     private List<HomePieceOfFurniture>              filteredAndSortedFurniture;
     private FurnitureFilter                         furnitureFilter;
+    private boolean printingAllLevels;
     private Set<HomeFurnitureGroup>                 expandedGroups;
     private List<TreeModelListener>                 treeModelListeners;
     private Map<Object, List<HomePieceOfFurniture>> childFurnitureCache;  
@@ -2181,8 +2310,9 @@ public class FurnitureTable extends JTable implements View, Printable {
       // Search furniture at viewable levels 
       List<HomePieceOfFurniture> viewableFurniture = new ArrayList<HomePieceOfFurniture>(furniture.size());
       for (HomePieceOfFurniture homePiece : furniture) {
-        if (homePiece.getLevel() == null
-            || homePiece.getLevel().isViewable()) {
+        if (this.printingAllLevels
+                || homePiece.getLevel() == null
+                || homePiece.getLevel().isViewable()) {
           viewableFurniture.add(homePiece);
         }
       }
